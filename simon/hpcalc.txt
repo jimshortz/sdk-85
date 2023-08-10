@@ -1,0 +1,57 @@
+Constants:
+
+6.11E6	(6.11MHz clock frequency)
+2	(8085 divides it by two)
+DIV
+1/X	(Seconds per t-state)
+STO 1
+
+98
+STO 2	(Fixed cost)
+
+24
+STO 3	(Variable cost)
+
+Frequency Calculation
+Input: Frequency in Hz
+Output: Number of iterations of loop
+
+LBL A
+RCL 1
+DIV
+RCL 2
+MINUS
+RCL 3
+DIV
+RTN
+
+Delay Length Calculation
+Input: Delay in seconds
+Output: Number of iterations of loop
+
+LBL B
+RCL 1
+DIV
+RCL 3
+DIV
+0.5
+ADD
+INT
+RTN
+
+Decimal To Hex Conversion
+Input: Decimal number
+Output: Hex digits, starting with most signifcant nibble.  10=A, 11=B, etc.
+
+LBL C
+65536	(Shift everything to the right of the decimal point)
+DIV
+LBL 1	(For each hex digit)
+FRAC	(Discard the already displayed integer portion)
+16	(Multiply by 16 to move the next digit to the left of the .)
+MULT
+ENTER	(Push a copy)
+INT	(Chop off the other digits)
+R/S	(Stop to show result to user)
+Rdown	(Pop the copy)
+GTO 2	(Do it again)

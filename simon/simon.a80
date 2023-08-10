@@ -1,0 +1,191 @@
+	NAME	SIMON
+;;; ************************************************************************
+;;; Simon for the Intel SDK-85
+;;; by Jim Shortz
+;;; August 2023
+;;; ************************************************************************
+
+;;; NOTE: ORG INSTRUCTIONS ARE USED TO ALLOW HAND KEYED CODE TO BE EASILY
+;;; REPAIRED.
+
+;;; CONSTANTS
+LIGHTS  EQU     00H             ; OUTPUT PORT FOR LIGHTS/SPEAKER
+LTDDR   EQU     02H             ; DATA DIRECTION REGISTER FOR LIGHTS/SPEAKER
+SWITCH  EQU     01H             ; INPUT PORT FOR SWITCHES
+SWCHDDR EQU     03H             ; DDR FOR SWITCHES
+SPKR	EQU	10H		; BIT THAT CONTROLS SPEAKER
+BUZZ	EQU	04H		; BUZZ TONE INDEX IN TTBL
+
+;;; EXTERNALS
+DELAY	EQU     05F1H		; ROM ROUTINE
+STCK	EQU	20C2H		; CALL STACK
+
+;;; BEGINNING OF PROGRAM
+        ORG     2000H
+INIT:   LXI     SP,STCK
+        MVI     A,0FFH          ; SET UP I/O PORTS
+        OUT     LTDDR
+        MVI     A,0F0H
+        OUT     SWCHDDR
+        MVI     A,00H           ; TURN OFF LIGHTS
+        OUT     LIGHTS
+        OUT     SWITCH          ; CLEAR UNUSED SWITCH BITS
+GAME:	INR     B               ; TIME-BASED RANDOM SEED
+        JZ      GAME            ; ENSURE NON-ZERO
+        IN      SWITCH          ; WAS BUTTON PRESSED?
+	XRI	0FH
+        JZ	GAME
+	MVI     C,1             ; START WITH ONE STEP
+TURN:   CALL    PLAY            ; PLAY SEQUENCE TO USER
+        CALL    REC             ; QUIZ USER
+        INR     C               ; SUCCESS, ADD ANOTHER STEP
+        JNZ     TURN            ; DO ANOTHER TURN
+	RST	1		; > 255 TURNS - YOU WIN!!!
+
+
+;;; DISPLAY SEQUENCE OF LIGHTS/SOUNDS TO USER
+;;; B = RANDOM SEED, C = NUMBER OF STEPS
+	ORG	2030H
+PLAY:   PUSH    B
+        MOV     A,B             ; RESET RANDOM GENERATOR TO SEED
+        STA     LFSR
+PLAY1:  CALL    NEXT            ; GET NEXT COLOR INTO A
+        CALL    SHOW            ; DISPLAY IT
+        CALL    TONE            ; PLAY TONE
+        DCR     C
+        JNZ     PLAY1
+        POP     B
+        RET
+
+;;; GET AND VERIFY BUTTON SEQUENCE FROM USER
+;;; B = RANDOM SEED, C = NUMBER OF STEPS
+;;; ABORTS IF INCORRECT
+	ORG	2050H
+REC:    PUSH    B
+        MOV     A,B
+        STA     LFSR
+REC1:   CALL    RDKEY           ; GET GUESS INTO A
+        MOV     B,A
+        CALL    NEXT            ; GET CORRECT ANSWER
+        CALL    SHOW            ; DISPLAY IT
+        CMP     B               ; WAS USER CORRECT?
+        JNZ     LOSE
+        CALL    TONE            ; PLAY THE TONE
+        DCR     C
+        JNZ     REC1
+        POP     B
+        RET
+
+;;; CALLED WHEN USER GUESSES WRONG.  BUZZES AND RESETS
+LOSE:   MVI     A,BUZZ
+        CALL    TONE
+        JMP     INIT
+
+;;; RETURN RANDOM VALUE IN A (0-3)
+	ORG	2800H		; EXPANSION RAM
+NEXT:	PUSH	B
+	CALL	NXBIT		; GET A RANDOM BIT
+	RAL			; SHIFT IT IN
+	MOV	B,A		; STASH IT
+	CALL	NXBIT		; AGAIN
+	MOV	A,B
+	RAL
+	ANI	03H		; MASK OFF EXTRA BITS
+	POP	B
+	RET
+
+;;; RETURN RANDOM BIT IN CY
+NXBIT:	LDA	LFSR		; LOAD STATE
+	RRC			; EXTRACT LSB
+	JNC	NXBIT1
+	XRI	1110B		; FLIP BITS 1,2,3. RRC SETS 7
+	STC
+NXBIT1:	STA	LFSR		; SAVE STATE
+	RET	
+
+;;; DISPLAY THE COLOR INDICATED BY A (0-3)
+	ORG	2820H
+SHOW:   PUSH	PSW		; SAVE REGS
+	PUSH    B
+        MOV     C,A		; COUNTER
+        STC			; SHIFT IN A 1 BIT
+        MVI     A,0
+SHOW1:  RAL			; KEEP MOVING UNTIL COUNTER EXHAUSTED
+        DCR     C
+        JP	SHOW1
+        OUT     LIGHTS		; OUTPUT TO PORT
+        POP     B		; RESTORE REGS
+	POP	PSW
+        RET
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; WAIT FOR A BUTTON PRESS.  RETURN BUTTON IN A (0-3) OR 4 IF TIMEOUT
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;	
+	ORG	2830H
+RDKEY:  PUSH    B		; SAVE REGS
+        MVI     C,0             ; ATTEMPT COUNTER
+RDKEY1: IN      SWITCH
+        XRI     0FH             ; ANY BUTTONS PRESSED?
+        JNZ     RDKEY2
+        LXI     D,2485 		; WAIT 19.5MS	
+        CALL    DELAY
+        DCR     C
+        JNZ     RDKEY1		; REPEAT IF < 256 TRIES
+	MVI	A,BUZZ		; TIMED OUT
+	JMP	RDKEY5
+        
+RDKEY2: MVI     C,0             ; ROTATE AND COUNT UNTIL WE FIND
+RDKEY3: RRC
+        JC      RDKEY4		; ZERO BIT
+        INR     C
+        JMP     RDKEY3
+	
+RDKEY4: MOV     A,C		; RETURN VALUE
+RDKEY5:	POP     B		; RESTORE REGS
+        RET
+
+;;; PLAY TONE FOR COLOR IN A (0-3) OR BUZZER (4)
+	ORG	2860H
+TONE:	PUSH	PSW		; SAVE REGS
+	PUSH	B
+	LXI	H,TTBL		; LOOK UP ENTRY IN TONE TABLE
+	RLC			; MULTIPLY BY 4
+	RLC
+	ADD	L		; ADD TO HL
+	MOV	L,A
+	MOV	C,M		; BC = DURATION (HALF-CYCLES)
+	INX	H
+	MOV	B,M
+	INX	H
+	MOV	E,M		; DE = HALF-CYCLE PERIOD (ITERATIONS)
+	INX	H
+	MOV	D,M
+TONE1:	IN	LIGHTS 		; TOGGLE SPEAKER BIT
+	XRI	SPKR
+	OUT	LIGHTS
+	PUSH	D		; PAUSE
+	CALL	DELAY
+	POP	D
+	DCX	B
+	MOV	A,C		; IS BC 0?
+	ORA	B
+	JNZ	TONE1
+	OUT	LIGHTS 		; TURN LIGHTS OFF
+	LXI	D,19090		; WAIT 150MS
+	CALL	DELAY
+	POP	B		; RESTORE REGS
+	POP	PSW
+	RET
+
+;;; TONE TABLE - CYCLES PER SECOND, LOOP ITERATIONS PER HALF-CYCLE
+	ORG	2890H
+TTBL:	DW	220,285		; RED (A3)
+	DW	330,189		; BLUE (E4)
+	DW	277,226		; YELLOW (C#4)
+	DW	165,382		; GREEN (E3)
+	DW	36*2,1730	; BUZZER (D2) (2X DURATION)
+	
+;;; GLOBAL VARIABLE
+LFSR:   DB      0               ; RANDOM GENERATOR STATE
+	END
+
