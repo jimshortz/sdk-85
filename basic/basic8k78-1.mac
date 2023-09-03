@@ -1,14 +1,4 @@
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; Intel SDK-80 BASIC
-;;; 
-;;; Adopted from Altair 8K BASIC source at
-;;; https://www.autometer.de/unix4fun/z80pack/ftp/altair/basic8k78-1.mac
-;;; Which was somehow derived from a 1978 printout by Udo Monk.
-;;;
-;;; Adapted to Intel SDK-85 by Jim Shortz
-;;; August 2023
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;	
-	
+;
 ; Page 1
 ;
 
@@ -18,65 +8,86 @@
 ;
 ;	file	'8k Basic'
 
-SDR	EQU	80H		; Serial data register
-SSR	EQU	81H		; Serial status register
-TXRDY	EQU	01H		; Transmit ready mask
-RXRDY	EQU	02H		; Receive ready mask
-		
-	ORG	8000H		; Beginning of RAM
 BASIC:				;FULL RESTART INITIALIZATION
 SYSINITJ:
-	IF 0
-	MVI	A,0H		; Reset 8251
-	OUT	SSR
-	OUT	SSR
-	OUT	SSR
-	MVI	A,40H
-	OUT	SSR
-	ENDIF
-	MVI	A,4EH		; 8N1, X16 baud rate
-	OUT	SSR
-	MVI	A,37H		; Enable RTS, DTR, TX, RX
-	OUT	SSR
-	MVI	A,'H'
-	CALL	SYSDISPL
-	MVI	A,'I'
-	CALL	SYSDISPL
 	JMP	INITIALZ
 REENTERBASIC:			;REENTER AFTER PAUSE
 	JMP	cmndrstr
 
+;
+;  Monitor Routines
+;
+co	equ	406h	;c -> screen
+cinb	equ	409h	;keyboard -> ac, carry set if any
+dclr	equ	538h	;clear screen
+xco	equ	4f4h	;c -> printer (blocking)
 ;
 ;  NON-BLOCKING INPUT
 ;   CHAR IN AC IF NOT ZERO
 ;   ZERO SET IF NONE
 ;
 SYSKEYIN:
-	IN	SSR
-	ANI	RXRDY		; CHECK RX RDY FLAG
-	RZ			; RETURN ZERO IF NO CHAR
-	IN	SDR		; READ CHAR
-	RET
+	push	b
+	push	d
+	push	h
+	call	cinb	;get char
+	jnc	syskeynone
+	cpi	0
+	jz	clearscreen
+	cpi	1fh	;us to bring to 14
+	jz	gomonitor
+syskeyinret:
+	pop	h
+	pop	d
+	pop	b
+	ret
+syskeynone:
+	sub	a	;set zero
+	jmp	syskeyinret
+clearscreen:
+	call	dclr	;clear screen
+	jmp	syskeynone
+gomonitor:
+	rst	1	;about using us (^_)
+	nop	
+	nop
 ;
 ;  SEND AC TO SCREEN
 ;
 SYSDISPL:
-	PUSH	PSW
-SYSD1:	IN	SSR		; WAIT FOR TXRDY TO BE SET
-	ANI	TXRDY
-	JZ	SYSD1
-	POP	PSW
-	OUT	SDR		; SEND CHAR
+	push	psw
+	push	b
+	push	d
+
+;
+; Page 2
+;
+
+	push	h
+	mov	c,a
+	call	co	;c to screen
+	lda	p3010	;print on the 3010 if zero
+	ana	a	
+	cz	xco	;yes print
+	pop	h
+	pop	d
+	pop	b
+	pop	psw
 	RET
 ;
 ;  CHECK FOR BREAK REQUEST
 ;   SET ZERO TO BREAK
 ;
 SYSBREAK:
-	CALL	SYSKEYIN
-	XRI	ETX		; CTRL-C
-	RET
-
+	call	syskeyin
+	jz	nobreak
+	sub	a
+	ret
+nobreak:
+	mvi	a,1
+	ora	a
+	ret
+;
 ;  DELAY
 ;
 SYSWAIT:
@@ -84,8 +95,9 @@ SYSWAIT:
 ;
 ;  RETURN TO MONITOR
 ;
+MONITOR	EQU	0B400H
 SYSQUIT:
-	RST	1
+	JMP	MONITOR
 
 ;
 ;  Page 3
@@ -541,12 +553,13 @@ ITEMSIZE    EQU	14		;DEFAULT WIDTH OF PRINT ITEM
 ;
 
 ;
-;  MEMORY ALLOCATION POINTERS
+;  MEMORY ALLOCATIN POINTERS
 ;
 
 
-;LIMLOWER   EQU	0C000H		; Dynamically determined
-LIMUPPER   EQU	0FFFFH
+;
+LIMLOWER   EQU	08000H
+LIMUPPER   EQU	0AF00H
 ;
 ;  MEMORY LAYOUT
 ;
@@ -4668,19 +4681,14 @@ INOTGEN:
 ;  Page 100
 ;
 
-	IF	1
-	;; TODO - fill these in
-cldstm:	ret
-csvstm:	ret
-	ELSE
 ;
-;  CSAVE/CLOAD PROCESSORS
+;  CSAVE/CLOAD ROCESSORS
 ;    save filename - save on diskette
 ;    load filename - get from diskette
 ;
 ;  load and save programs from the disk
 ;
-d14base	equ	0b400h		
+d14base	equ	0b400h
 fsprom	equ	0b000h
 bootstart  equ	fsprom+39bh	;load image files
 directorylookup  equ  d14base+4e0h  ;find filename
@@ -4764,6 +4772,7 @@ sfndone:
 	mov	m,a		;store count
 	ret
 
+
 ;  checkprogram
 ;    walk over the program looking for the end
 ;    return last byte+1 in hl
@@ -4787,8 +4796,6 @@ cprogloop2:
 cprogok:
 	ret
 filename:  ds	60
-
-	ENDIF
 
 ;
 ;  Page 102
@@ -6291,6 +6298,7 @@ INITIALZ:
 	SHLD	STCKBASE
 	XRA	A
 	STA	PRINTFLG
+	call	dclr
 	CALL	PRNTCRLF
 	LXI	H,LIMUPPER	;ADDRESS LAST BYTE
 	SHLD	STRGTLIM
@@ -6338,7 +6346,7 @@ INITIALZ:
 ;  Page 134
 ;
 
-;	SHLD	SYSINITJ+1	NOT SURE WHAT THIS IS ABOUT
+	SHLD	SYSINITJ+1
 	PCHL
 
 
@@ -6350,6 +6358,7 @@ INITSTSP:
 	DS	30*2+LINESYZE	;INITIALIZE STACK SPACE
 INITSTCK:
 	DS	20
-LIMLOWER:			; Program memory begins here
+
+
 
 	END

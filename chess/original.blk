@@ -1,0 +1,3 @@
+code: unlabeled start 0 unlabeled end 0x9dd type code
+data: unlabeled start 0x9dd unlabeled end 0xde6 type bytedata
+drivers: unlabeled start 0xde6 unlabeled end 0xdfe type code

@@ -1,0 +1,15 @@
+; SIMH command file for running Microchess 8080
+ 
+set cpu 8080
+load original.bin 0
+
+; Patch I/O routines to work with Altair SIO
+dep de7 10
+dep de9 02
+dep def 11
+dep df2 10
+dep df4 01
+dep df9 11
+
+; Start it up
+g 0

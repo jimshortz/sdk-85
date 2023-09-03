@@ -1,0 +1,34 @@
+; Symbols for disassembly
+; Memory locations as described in Microchess manual
+;
+; for use with z80dasm -S
+
+start:	equ 0x0
+
+; TTY Output Routine
+ttyo:	equ 0xde6
+
+; TTY Input Routine
+ttyi:	equ 0xdf1
+
+; Jump to Input Routine
+invec:	equ 0x9da
+
+; Jump to Output Routine
+outvec:	equ 0x09d7
+
+; Display the board
+disp:	equ 0x0242	; Display routine
+
+; Optionally display board after Microchess' turn
+dispm:	equ 0x120
+
+; Optionally display board after challenger's turn
+dispc:	equ 0x259
+
+; Board location of each piece
+board:	equ 0x9ed
+
+; Exit to Operating System
+exit:	equ 0x1d7
+
