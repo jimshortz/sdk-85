@@ -1,6 +1,7 @@
 ;;; High speed loader for SDK-85
 ;;; Loads binary core images from serial port (8N1) to RAM
-	
+
+LOC	EQU	2000H		; Where to load program
 DEST	EQU	8000H		; Where to write program
 STK	EQU	20C2H		; Stack pointer
 SHOW	EQU	1		; Show progress on hex displays
@@ -14,7 +15,7 @@ SSR	EQU	81H		; Serial status register
 UPDAD	EQU	363H		; Display address routine
 UPDDT	EQU	36EH		; Display data
 	
-	ORG	2000H
+	ORG	LOC
 	LXI	H,DEST
 	LXI	SP,STK		; Jump here to set different dest
 

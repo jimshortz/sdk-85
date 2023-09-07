@@ -10,7 +10,9 @@
 
 int main(int argc, char** argv) {
     FILE* f;
-    unsigned char c = 0;
+    unsigned char sum = 0;
+    int c;
+    int len = 0;
 
     if (argc != 2) {
 	fprintf(stderr, "Usage:\nxsum filename\n");
@@ -22,10 +24,11 @@ int main(int argc, char** argv) {
 	fprintf(stderr, "Could not open %s\n", argv[1]);
 	exit(2);
     }
-	
-    while (!feof(f)) {
-	c += fgetc(f);
+
+    while ((c = fgetc(f)) >= 0) {
+	sum += c;
+	len++;
     }
 
-    printf("0%02Xh\n", c);
+    printf("len = %04X\tsum=%02X\n", len, sum);
 }
