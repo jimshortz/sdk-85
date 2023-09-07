@@ -1,0 +1,95 @@
+/************************************************************************
+ * PRIMES.PLM
+ *
+ * Finds prime numbers using the classic sieve algorithm.
+ *
+ * by Jim Shortz - Sep 2023
+ ************************************************************************/
+PRIMES:
+DO;
+
+DECLARE
+	MAX LITERALLY '8192',		/* Largest number to find */
+	SDR LITERALLY '80H',		/* Serial data register */
+	SSR LITERALLY '81H',		/* Serial status register */
+	TXRDY LITERALLY '01H',		/* TXRDY serial flag */
+	RXRDY LITERALLY '02H';		/* RXRDY serial flag */
+
+DECLARE	FLAGS(MAX) BYTE;		/* 1 if number is prime */
+DECLARE	(I,J) ADDRESS;
+
+/************************************************************************
+ * Sets up serial port
+ ***********************************************************************/
+INIT: PROCEDURE;
+      OUTPUT(SSR) = 4EH;
+      OUTPUT(SSR) = 37H;
+END;
+
+/************************************************************************
+ * Displays character C to serial port
+ ***********************************************************************/
+PRCHR: PROCEDURE (C);
+       DECLARE C BYTE;
+
+       /* Wait for clear TX buffer */
+       DO WHILE (INPUT(SSR) AND TXRDY) = 0;
+       END;
+
+       OUTPUT(SDR) = C;
+END PRCHR;
+
+/************************************************************************
+* Prints N to serial port as a decimal number
+************************************************************************/
+PRNUM: PROCEDURE (N);
+   DECLARE (N) ADDRESS,
+  		   BUF(5) BYTE,
+		   I ADDRESS;
+
+   /* Extract digits right to left */
+   DO I = 1 TO 5;
+      BUF(5-I) = N MOD 10;
+      N = N / 10;
+   END;
+
+   /* Skip leading zeros */
+   I = 0;
+   DO WHILE I < 4 AND BUF(I) = 0;
+   	  I = I + 1;
+   END;
+
+   /* Print digits */
+   DO WHILE I < 5;
+   	  CALL PRCHR(BUF(I) OR 30H);
+	  I = I + 1;
+   END;
+
+   /* Print CR/LF */
+   CALL PRCHR(13);
+   CALL PRCHR(10);
+END PRNUM;
+
+/************************************************************************
+ * Main program
+ ***********************************************************************/
+
+CALL INIT;
+
+/* Clear array */
+DO I = 2 TO MAX-1;
+   FLAGS(I) = 0;
+END;
+
+/* Find primes */
+DO I = 2 TO MAX-1;
+   IF FLAGS(I) = 0 THEN DO;
+      CALL PRNUM(I);
+      J = I + I;
+      DO WHILE J < MAX;
+      	 FLAGS(J) = 1;
+	 J = J + I;
+      END;
+   END;
+END;
+END;
