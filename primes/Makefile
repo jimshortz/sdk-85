@@ -1,10 +1,17 @@
-primes.bin:	primes.obj
+all:	primes.hex
+
+primes.abs:	primes.obj
 	link primes.obj,plm80.lib to primes.rel MAP
 	locate primes.rel TO primes.abs CODE\(8000h\) MAP
-	objcore primes.abs primes.bin
 
-primes.obj:	primes.plm
-	-plm80c primes.plm
+%.obj:	%.plm
+	-plm80c $< CODE
+
+%.hex:	%.abs
+	objhex $< $@
+
+%.bin:	%.abs
+	objcore $< $@
 
 clean:
-	rm *.obj
+	rm *.obj *.abs *.rel *.bin *.hex

@@ -1,0 +1,155 @@
+/************************************************************************
+ * Intel hex loader
+ * For SDK-85
+ * by Jim Shortz
+ ***********************************************************************/
+ 
+HLOAD:
+DO;
+DECLARE
+	TRUE LITERALLY '0FFH',
+	FALSE LITERALLY '00H',
+	DATTYPE LITERALLY '00H',	/* Data record type */
+	ENDTYPE LITERALLY '01H',	/* End record type */
+	MINADDR LITERALLY '8000H',	/* Beginning of expanded RAM */
+	MAXADDR LITERALLY '0F800H';	/* Beginning of this loader */
+
+DECLARE	XSUM	BYTE,	  		/* Running checksum */
+	TYPE 	BYTE,			/* Record type */
+	LEN 	BYTE,			/* Length of record */
+	SUM	BYTE,			/* Transmitted checksum */
+	ADDR 	ADDRESS;		/* Address of record */
+
+/* Setup serial port */
+INIT: PROCEDURE EXTERNAL;
+END;
+
+/* Exit program */
+EXIT: PROCEDURE EXTERNAL;
+END;
+
+/* Read a byte from serial port */
+GETC: PROCEDURE BYTE EXTERNAL;
+END;
+
+/* Write a byte to serial port */
+PUTC: PROCEDURE(C) EXTERNAL;
+      DECLARE C BYTE;
+END;
+
+/* Get character with echo */
+GETCE: PROCEDURE BYTE;
+       DECLARE C BYTE;
+       C = GETC;
+       CALL PUTC(C);
+       RETURN C;
+END;
+       
+/************************************************************************
+ * Reads a character from the serial port and converts it to a 0-15
+ * value.  Returns 0FFH if invalid.
+ ***********************************************************************/
+GETNYB: PROCEDURE BYTE;
+	DECLARE (C,VAL) BYTE;
+
+	C = GETCE;
+	IF C >= '0' AND C <= '9' THEN
+	   VAL =  C - '0';
+	ELSE IF C >= 'A' AND C <= 'F' THEN
+	   VAL =  C - 'A' + 10;
+	ELSE
+	   RETURN 0FFH;
+END;		
+
+/************************************************************************
+ * Reads a hex byte from the serial port
+ ***********************************************************************/
+GETBYTE: PROCEDURE BYTE;
+	 DECLARE (H,L,X) BYTE;
+
+	H = GETNYB;
+	L = GETNYB;
+	X = SHL(H,4) OR L;
+	XSUM = XSUM + X;
+	RETURN X;
+END;
+
+/************************************************************************
+ * Reads a hex address (4 digits) from the serial port
+ ***********************************************************************/
+GETADDR: PROCEDURE ADDRESS;
+	 DECLARE (H,L) BYTE;
+
+	 H = GETBYTE;
+	 L = GETBYTE;
+
+	 RETURN SHL(DOUBLE(H),8) OR DOUBLE(L);
+END;
+
+/************************************************************************
+ * Data record handler
+ ***********************************************************************/
+DATREC: PROCEDURE;
+    DECLARE D		BASED ADDR BYTE,
+	    ENDADDR	ADDRESS;
+	
+    ENDADDR = ADDR + LEN;
+
+    /* Don't accept writes outside of expansion RAM */
+    IF ADDR < MINADDR OR ENDADDR > MAXADDR THEN DO;
+        CALL PUTC('A');
+        RETURN;
+    END;
+
+    /* Read bytes into RAM */
+    DO WHILE ADDR < ENDADDR;
+        D = GETBYTE;
+      	ADDR = ADDR + 1;
+    END;
+END;
+
+/************************************************************************
+ * Handles end record
+ ***********************************************************************/
+ENDREC: PROCEDURE;
+	CALL PUTC('O');
+	CALL PUTC('K');
+	CALL PUTC(13);
+	CALL EXIT;
+END;
+
+/* Main Program */
+CALL INIT;
+
+/* Show a lame excuse for a prompt */
+CALL PUTC('>');
+TYPE = DATTYPE;
+
+DO WHILE TYPE <> ENDTYPE;
+   /* Wait for start of record */
+   DO WHILE GETCE <> ':';
+   END;
+
+   /* Read record header */
+   XSUM = 0;
+   LEN = GETBYTE;
+   ADDR = GETADDR;
+   TYPE = GETBYTE;
+   IF TYPE = DATTYPE THEN
+      CALL DATREC;     
+   ELSE IF TYPE <> ENDTYPE THEN
+      CALL PUTC('?');	/* Unknown record type */
+
+   /* Verify checksum */
+   SUM = GETBYTE;
+   IF XSUM <> 0 THEN DO;
+      HALT;
+      CALL PUTC('!');	/* Checksum error */
+   END;
+
+   IF TYPE = ENDTYPE THEN
+      CALL ENDREC;
+END;
+
+CALL EXIT;
+END;
