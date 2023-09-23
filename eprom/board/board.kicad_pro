@@ -389,7 +389,9 @@
   },
   "libraries": {
     "pinned_footprint_libs": [],
-    "pinned_symbol_libs": []
+    "pinned_symbol_libs": [
+      "8088"
+    ]
   },
   "meta": {
     "filename": "board.kicad_pro",
@@ -419,9 +421,7 @@
       "version": 3
     },
     "net_colors": null,
-    "netclass_assignments": {
-      "VCC": "power"
-    },
+    "netclass_assignments": null,
     "netclass_patterns": []
   },
   "pcbnew": {
