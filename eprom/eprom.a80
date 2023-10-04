@@ -1,0 +1,122 @@
+;;; EPROM Programmer
+;;; Programs 8755A EPROMS using the SDK-85 and EPROM daughterboard
+
+;;; Memory layout
+START	EQU	2000H		; Location of this module
+STK	EQU	20C2H		; Top of stack
+BUF	EQU	8000H		; Memory buffer to write to EPROM
+BUFEND	EQU	8800H		; End of buffer+1
+	
+;;; I/O Ports
+CMD	EQU	20H		; Command register for port A,B
+PORTA	EQU	21H		; SDK-85 port A (connected to AD0-AD7)
+PORTB	EQU	22H		; SDK-85 port B
+
+;;; CMD Mask bits
+OUTA	EQU	1		; Port A output mode
+OUTB	EQU	2		; Port B output mode
+
+;;; PORTB address bits
+ALE	EQU	00010000B
+RD	EQU	00100000B	; /RD (active low)
+PROG	EQU	01000000B
+VDD	EQU	10000000B
+
+;;; ROM entry points
+UPDADR	EQU	0363H		
+DELAY	EQU	05F1H
+
+;;; Macro to delay 2 microseconds
+DLY2US	MACRO
+	NOP			; Burn 6 T-states
+	NOP
+	ENDM
+
+;;; Macro to delay 50 milliseconds
+DLY50MS	MACRO
+	PUSH	D
+	LXI	D,6365
+	CALL	DELAY
+	POP	D
+	ENDM
+
+;;; Main routine
+MAIN:	ORG	START
+	LXI	SP,STK
+	CALL	INIT
+
+	RST	1
+	CALL	RDBYTE
+	RST	1
+	CALL	WRBYTE
+	RST	1
+
+INIT:	MVI	A,OUTA OR OUTB	; Set DDRs
+	OUT	CMD
+	MVI	A,0		; Clear address and ctrl bits
+	OUT	PORTA
+	MVI	A,RD		; Deassert /RD
+	OUT	PORTB
+	RET
+
+;;; Set up 8755 to read/write address HL
+LDADR:	PUSH	PSW
+	MOV	A,H		; Write A8-11 to PORTB
+	ANI	111B
+	ORI	RD		; Deassert /RD
+	OUT	PORTB
+	MOV	A,L		; Write A0-A7 to PORTA
+	OUT	PORTA
+	IN	PORTB		; Strobe ALE
+	ORI	ALE
+	OUT	PORTB
+	ANI	NOT ALE
+	OUT	PORTB
+	POP	PSW
+	RET
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Writes A value into EPROM at address HL
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+WRBYTE:	PUSH	H
+	PUSH	PSW
+	CALL	LDADR
+	OUT	PORTA		; Write byte to data lines
+	IN	PORTB
+	ORI	PROG
+	OUT	PORTB
+	DLY2US			; 2us delay
+	ORI	VDD
+	OUT	PORTB
+	DLY50MS			; 50ms delay
+	IN	PORTB
+	ANI	NOT VDD
+	OUT	PORTB
+	DLY2US			; 2us delay
+	ANI	NOT PROG
+	OUT	PORTB
+	POP	PSW
+	POP	H
+	RET
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Read byte from EPROM at address HL into A
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+RDBYTE:	CALL	LDADR
+	MVI	A,OUTB		; Switch PORTA to input
+	OUT	CMD
+	IN	PORTB		; Assert /RD
+	ANI	NOT RD
+	OUT	PORTB
+	IN	PORTA		; Read value
+	PUSH	PSW
+	IN	PORTB		; Deassert /RD
+	ORI	RD
+	OUT	PORTB
+	MVI	A,OUTA OR OUTB
+	ORI	OUTA		; PORTA back to output
+	OUT	CMD
+	POP	PSW
+	RET
+
+	END
+	
