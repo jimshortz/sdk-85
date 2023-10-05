@@ -2,10 +2,10 @@
 ;;; Programs 8755A EPROMS using the SDK-85 and EPROM daughterboard
 
 ;;; Memory layout
-START	EQU	2000H		; Location of this module
+START	EQU	8000H		; Location of this module
 STK	EQU	20C2H		; Top of stack
-BUF	EQU	8000H		; Memory buffer to write to EPROM
-BUFEND	EQU	8800H		; End of buffer+1
+BUF	EQU	8800H		; Memory buffer to write to EPROM
+BUFEND	EQU	9000H		; End of buffer+1
 	
 ;;; I/O Ports
 CMD	EQU	20H		; Command register for port A,B
@@ -40,17 +40,48 @@ DLY50MS	MACRO
 	POP	D
 	ENDM
 
+;;; Decrement BC and jump to LBL if not zero
+DECBC	MACRO	LBL
+	DCX	B
+	MOV	A,B
+	ORA	C
+	JNZ	LBL
+	ENDM
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Main routine
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 MAIN:	ORG	START
 	LXI	SP,STK
 	CALL	INIT
 
-	RST	1
-	CALL	RDBYTE
-	RST	1
-	CALL	WRBYTE
-	RST	1
+	;; TODO - Blank check
+	LXI	H,BUF		; Starting address
+	LXI	B,256		; Number of bytes to write
 
+	;; Burn ROM
+	PUSH	B
+	PUSH	H
+WRLP:	MOV	A,M
+	CALL	WRBYTE
+	INX	H
+	DECBC	WRLP
+	
+	;; Read back ROM and verify
+	POP	H
+	POP	B
+RDLP:	CALL	RDBYTE
+	CMP	M
+	JNZ	RDERR
+	INX	H
+	DECBC	RDLP
+	
+EXIT:	RST	1
+	NOP
+RDERR:	RST	1
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Sets up I/O ports for 8755 programming
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 INIT:	MVI	A,OUTA OR OUTB	; Set DDRs
 	OUT	CMD
 	MVI	A,0		; Clear address and ctrl bits
@@ -58,8 +89,10 @@ INIT:	MVI	A,OUTA OR OUTB	; Set DDRs
 	MVI	A,RD		; Deassert /RD
 	OUT	PORTB
 	RET
-
-;;; Set up 8755 to read/write address HL
+	
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Load address from HL into 8755
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 LDADR:	PUSH	PSW
 	MOV	A,H		; Write A8-11 to PORTB
 	ANI	111B
@@ -74,8 +107,9 @@ LDADR:	PUSH	PSW
 	OUT	PORTB
 	POP	PSW
 	RET
+	
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; Writes A value into EPROM at address HL
+;;; Write A value into EPROM at address HL
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 WRBYTE:	PUSH	H
 	PUSH	PSW
