@@ -1,11 +1,10 @@
 ;;; High speed loader for SDK-85
 ;;; Loads binary core images from serial port (8N1) to RAM
 
-LOC	EQU	2000H		; Where to load program
+LOC	EQU	0800H		; Where to load program
 DEST	EQU	8000H		; Where to write program
 STK	EQU	20C2H		; Stack pointer
 SHOW	EQU	1		; Show progress on hex displays
-BRG	EQU	0		; Use 8155 as baud rate generator
 
 ;;; Serial port addresses
 SDR	EQU	80H		; Serial data register
@@ -15,19 +14,10 @@ SSR	EQU	81H		; Serial status register
 UPDAD	EQU	363H		; Display address routine
 UPDDT	EQU	36EH		; Display data
 	
-	ORG	LOC
+	CSEG
 	LXI	H,DEST
 	LXI	SP,STK		; Jump here to set different dest
 
-	IF 	BRG		; Set up baud rate generator
-	MVI	A,11000000B	; Timer mode
-	OUT	28H
-	MVI	A,3EH		; Baud rate divisor 3.05Mhz/9600 = 318.2     
-	OUT	2CH
-	MVI	A,41H		; High byte plus bit 6 set for timer reset
-	OUT	2DH
-	ENDIF
-	
 	;; Assumes 8251 has been reset
 	MVI	A,01001110B	; 8N1, Baud X16
 	OUT	SSR
