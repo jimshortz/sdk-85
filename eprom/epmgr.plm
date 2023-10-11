@@ -1,0 +1,373 @@
+/************************************************************************
+ * EPROM Manager
+ * For SDK-85
+ * by Jim Shortz
+ ***********************************************************************/
+ 
+EPMGR:
+DO;
+DECLARE
+	TRUE LITERALLY '0FFH',
+	FALSE LITERALLY '00H',
+	DATTYPE LITERALLY '00H',	/* Data record type */
+	ENDTYPE LITERALLY '01H',	/* End record type */
+	BLANK	LITERALLY '0FFH';	/* Uninitalized ROM */
+
+DECLARE	XSUM	BYTE,	  		/* Running checksum */
+	BUF(800H) BYTE;			/* Holds program being burned */
+
+/* Setup serial port */
+IOINIT: PROCEDURE EXTERNAL;
+END;
+
+/* Exit program */
+EXIT: PROCEDURE EXTERNAL;
+END;
+
+/* Read a byte from serial port */
+GETC: PROCEDURE BYTE EXTERNAL;
+END;
+
+/* Write a byte to serial port */
+PUTC: PROCEDURE(C) EXTERNAL;
+      DECLARE C BYTE;
+END;
+
+/* Write a carriage return and line feed */
+CRLF:	PROCEDURE;
+	CALL PUTC(13);
+	CALL PUTC(10);
+	END;
+	
+/* Write a string to the serial port */
+PUTS: PROCEDURE(S);
+      DECLARE S ADDRESS;
+      DECLARE C BASED S BYTE;
+
+      DO WHILE C > 0;
+      	 CALL PUTC(C);
+	 S = S + 1;
+      END;
+END;
+
+/* Write a hex digit */
+PUTNYB:	PROCEDURE(N);
+	DECLARE N BYTE,
+		A BYTE;
+		
+	IF N < 10 THEN
+	   A = '0' + N;
+	ELSE
+	   A = 'A' + N - 10;
+	CALL PUTC(A);
+	END;
+
+/* Write a byte to the serial port as hex */
+PUTBYTE: PROCEDURE(C);
+	 DECLARE C BYTE;
+
+	 XSUM = XSUM + C;
+	 CALL PUTNYB(SHR(C,4));
+	 CALL PUTNYB(C AND 0FH);
+	 END;
+
+PUTADDR: PROCEDURE(A);
+	 DECLARE A ADDRESS;
+	 CALL PUTBYTE(HIGH(A));
+	 CALL PUTBYTE(LOW(A));
+	 END;
+	 
+/* Setup EPROM interface */
+EPINIT:	 PROCEDURE EXTERNAL;
+END;
+
+/* Read byte from eprom */
+EPREAD:	PROCEDURE(ADDR) BYTE EXTERNAL;
+	DECLARE ADDR ADDRESS;
+END;
+
+EPPROG:	PROCEDURE(ADDR,D) EXTERNAL;
+	DECLARE ADDR ADDRESS;
+	DECLARE D BYTE;
+END;
+
+/* Get character with echo */
+GETCE: PROCEDURE BYTE;
+       DECLARE C BYTE;
+       C = GETC;
+       CALL PUTC(C);
+       RETURN C;
+END;
+       
+/************************************************************************
+ * Reads a character from the serial port and converts it to a 0-15
+ * value.  Returns 0FFH if invalid.
+ ***********************************************************************/
+GETNYB: PROCEDURE BYTE;
+	DECLARE (C,VAL) BYTE;
+
+	C = GETCE;
+	IF C >= '0' AND C <= '9' THEN
+	   VAL =  C - '0';
+	ELSE IF C >= 'A' AND C <= 'F' THEN
+	   VAL =  C - 'A' + 10;
+	ELSE
+	   RETURN 0FFH;
+END;		
+
+/************************************************************************
+ * Reads a hex byte from the serial port
+ ***********************************************************************/
+GETBYTE: PROCEDURE BYTE;
+	 DECLARE (H,L,X) BYTE;
+
+	H = GETNYB;
+	L = GETNYB;
+	X = SHL(H,4) OR L;
+	XSUM = XSUM + X;
+	RETURN X;
+END;
+
+/************************************************************************
+ * Reads a hex address (4 digits) from the serial port
+ ***********************************************************************/
+GETADDR: PROCEDURE ADDRESS;
+	 DECLARE (H,L) BYTE;
+
+	 H = GETBYTE;
+	 L = GETBYTE;
+
+	 RETURN SHL(DOUBLE(H),8) OR DOUBLE(L);
+END;
+
+/************************************************************************
+ * Blank check routine.
+ * Returns first non-matching address or 800H if OK
+ ***********************************************************************/
+BCHECK:	PROCEDURE ADDRESS;
+
+	DECLARE	ADDR ADDRESS;
+	DECLARE D BYTE;
+
+	DO ADDR = 0 TO 7FFH;
+	   D = EPREAD(ADDR);
+	   IF D <> BLANK THEN
+	      RETURN ADDR;
+	END;
+
+	RETURN 800H;
+END;
+
+/************************************************************************
+ * Blank check command
+ ***********************************************************************/
+BCHECK$CMD: PROCEDURE;
+	   DECLARE ADDR ADDRESS;
+
+	   ADDR = BCHECK;
+	   IF ADDR < 800H THEN DO;
+	      CALL PUTS(.('Non-blank value found at ',0));
+	      CALL PUTADDR(ADDR);
+	      CALL CRLF;
+	   END;
+	   ELSE
+	      CALL PUTS(.('ROM is blank',13,10,0));
+END;
+
+/************************************************************************
+ * Clear buffer
+ ***********************************************************************/
+CLEAR:	PROCEDURE;
+	DECLARE	ADDR	ADDRESS;
+
+	DO ADDR = 0 TO 7FFH;
+	   BUF(ADDR) = BLANK;
+	END;
+END;
+
+/************************************************************************
+ * Clear buffer command
+ ***********************************************************************/
+CLEAR$CMD: PROCEDURE;
+    CALL CLEAR;
+    CALL PUTS(.('Buffer cleared',13,10,0));
+END;
+
+/************************************************************************
+ * Write buffer to EPROM
+ ***********************************************************************/
+PROG$CMD:	PROCEDURE;
+    DECLARE ADDR ADDRESS;
+
+    CALL PUTS(.('Writing ROM: 0000',0));
+    DO ADDR = 0 TO 7FFH;
+       CALL PUTS(.(8,8,8,8,0));	/* 4 backspaces */
+       CALL PUTADDR(ADDR);
+       CALL EPPROG(ADDR, BUF(ADDR));
+    END;
+
+    CALL PUTS(.(' Done.',13,10,0));
+END;
+
+/************************************************************************
+ * Copy EPROM to buffer
+ ***********************************************************************/
+READ$CMD:	PROCEDURE;
+    DECLARE ADDR ADDRESS;
+
+    CALL PUTS(.('Reading ROM...', 0));
+    DO ADDR = 0 TO 7FFH;
+       BUF(ADDR) = EPREAD(ADDR);
+    END;
+    CALL PUTS(.(' Done.',13,10,0));
+END;
+
+/************************************************************************
+ * Compare EPROM to buffer
+ ***********************************************************************/
+VERIFY$CMD:	PROCEDURE;
+    DECLARE ADDR ADDRESS,
+    	    B 	 BYTE;
+
+    DO ADDR = 0 TO 7FFH;
+        B = EPREAD(ADDR);
+    	IF B <> BUF(ADDR) THEN DO;
+           CALL PUTS(.('Mismatch at ',0));
+	   CALL PUTADDR(ADDR);
+	   CALL CRLF;
+           RETURN;
+	END;
+    END;
+    
+    CALL PUTS(.('Verify OK',13,10,0));
+END;
+
+/************************************************************************
+ * Download Intel Hex records from host to buffer
+ ***********************************************************************/
+DNLOAD$CMD:	PROCEDURE;
+	DECLARE	ERRCNT	BYTE,
+		C	BYTE,
+		TYPE 	BYTE,			/* Record type */
+		LEN 	BYTE,			/* Length of record */
+		SUM	BYTE,			/* Transmitted checksum */
+		ADDR 	ADDRESS;		/* Address of record */
+
+	ERRCNT = 0;
+	TYPE = DATTYPE;
+	CALL PUTS(.('Send hex data now, ^C to abort',13,10,0));
+	
+	DO WHILE TYPE <> ENDTYPE;
+	   /* Wait for start of record */
+	   C = 0;	   
+	   DO WHILE C <> ':';
+	      C = GETCE;
+	      IF C = 3 THEN DO;
+	      	 CALL PUTS(.('Aborted',13,10,0));
+		 RETURN;
+	      END;
+	   END;
+
+	   XSUM = 0;
+	   LEN = GETBYTE;
+	   ADDR = GETADDR AND 7FFH;
+	   TYPE = GETBYTE;
+	   IF TYPE = DATTYPE THEN DO;
+	      /* Read data record */
+	      DO C = 0 TO LEN-1;
+	      	 BUF(ADDR + C) = GETBYTE;
+	      END;
+	      C = GETBYTE;	/* Checksum */
+	      IF XSUM <> 0 THEN DO;
+	      	 CALL PUTS(.('Bad checksum',13,10,0));
+		 ERRCNT = ERRCNT + 1;
+	      END;
+	   END;
+	   ELSE IF TYPE <> ENDTYPE THEN DO;
+	       CALL PUTS(.('Bad record type',13,10,0));
+	       ERRCNT = ERRCNT + 1;
+	   END;
+	   CALL CRLF;
+	END;
+
+	IF ERRCNT = 0 THEN
+	   CALL PUTS(.('Download OK',13,10,0));
+	ELSE
+           CALL PUTS(.('Download failed',13,10,0));
+END;
+
+/************************************************************************
+ * Uploads buffer to host in Intel hex format.
+ ***********************************************************************/
+UPLOAD$CMD:	PROCEDURE;
+	DECLARE	I	BYTE,
+		J	BYTE,
+		ADDR ADDRESS;
+	XSUM = 0;
+
+	ADDR = 0;
+	DO I = 1 TO 80H;
+	   CALL PUTC(':');
+	   CALL PUTBYTE(10H);	/* Length */
+	   CALL PUTADDR(ADDR);
+	   CALL PUTBYTE(DATTYPE);
+	   DO J = 0 TO 0FH;
+	      CALL PUTBYTE(BUF(ADDR));
+	      ADDR = ADDR + 1;
+	   END;
+	   CALL PUTBYTE(-XSUM);
+	   CALL CRLF;	   
+	END;
+	CALL PUTS(.(':00000001FF', 13, 10, 0));
+END;
+	   
+
+/************************************************************************
+ * Displays a help message
+ ***********************************************************************/
+HELP$CMD:	PROCEDURE;
+      	CALL PUTS(.('Commands:',13,10,
+	'(B)lank check',13,10,
+	'(C)lear buffer',13,10,
+	'(D)ownload hex to buffer',13,10,
+	'(R)ead EPROM to buffer',13,10,
+	'(P)rogram EPROM from buffer',13,10,
+	'(U)pload buffer',13,10,
+	'(V)erify EPROM',13,10,0));
+END;
+
+/************************************************************************
+ * Main Program
+ ***********************************************************************/
+DECLARE CMD BYTE;
+
+CALL IOINIT;
+CALL EPINIT;
+
+CALL PUTS(.(13,10,13,10,'SDK-85 EPROM Manager v1.0 by Jim Shortz',13,10,0));
+CALL CLEAR;
+
+DO WHILE 1=1;
+   CALL PUTS(.('Enter command (H for help):',13,10,0));
+   CMD = GETC;
+   IF CMD = 'H' THEN
+      CALL HELP$CMD;
+   ELSE IF CMD = 'B' THEN
+      CALL BCHECK$CMD;
+   ELSE IF CMD = 'C' THEN
+      CALL CLEAR$CMD;
+   ELSE IF CMD = 'D' THEN
+      CALL DNLOAD$CMD;
+   ELSE IF CMD = 'R' THEN
+      CALL READ$CMD;
+   ELSE IF CMD = 'P' THEN
+      CALL PROG$CMD;
+   ELSE IF CMD = 'U' THEN
+      CALL UPLOAD$CMD;
+   ELSE IF CMD = 'V' THEN
+      CALL VERIFY$CMD;
+   ELSE
+	CALL PUTS(.('Unknown command.',13,10,0));
+END;
+
+END;

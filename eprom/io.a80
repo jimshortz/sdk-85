@@ -1,0 +1,56 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; I/O Routines for SDK-85
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;	
+SDR	EQU	80H		; Serial data register
+SSR	EQU	81H		; Serial status register
+TXRDY	EQU	01H		; Transmit ready mask
+RXRDY	EQU	02H		; Receive ready mask
+
+	PUBLIC	IOINIT,GETC,PUTC,EXIT
+	
+	CSEG
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; I/O Initialization routine
+;;;
+;;; Expects 8251A to have not been used since reset
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+IOINIT:	IF 0
+	MVI	A,0H		; Reset 8251
+	OUT	SSR
+	OUT	SSR
+	OUT	SSR
+	MVI	A,40H
+	OUT	SSR
+	ENDIF
+	MVI	A,4EH		; 8N1, X16 baud rate
+	OUT	SSR
+	MVI	A,37H		; Enable RTS, DTR, TX, RX
+	OUT	SSR
+	RET
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Read a byte from the serial port.  Blocks until available
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+GETC:	IN	SSR		; WAIT FOR RXRDY TO BE SET
+	ANI	RXRDY		
+	JZ	GETC
+	IN	SDR		; READ CHAR
+	RET
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Write a byte from C to the serial port.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+PUTC:	IN	SSR		; WAIT FOR TXRDY TO BE SET
+	ANI	TXRDY
+	JZ	PUTC
+	MOV	A,C		; WRITE CHAR
+	OUT	SDR
+	RET
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Exits to SDK-85 monitor
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+EXIT:	RST	1
+
+	END
