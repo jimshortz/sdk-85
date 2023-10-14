@@ -115,7 +115,7 @@ ENDREC: PROCEDURE;
 	CALL PUTC('O');
 	CALL PUTC('K');
 	CALL PUTC(13);
-	CALL EXIT;
+	CALL ADDR;
 END;
 
 /* Main Program */

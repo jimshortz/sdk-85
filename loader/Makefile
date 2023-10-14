@@ -1,4 +1,4 @@
-all:	xsum loader800.bin loader2000.bin hexload800.bin hexloadf800.bin
+all:	xsum loader800.bin loader2000.bin hexload800.hex hexloadf800.bin
 
 loader800.obj:	loader.obj
 	locate $< TO $@ CODE\(00800h\) STACK\(2000h\) MAP SYMBOLS PUBLICS	
@@ -26,9 +26,6 @@ hload.obj:	hload.plm
 
 io.obj:	io.plm
 	-plm80c io.plm CODE
-
-altio.obj:	altio.plm
-	-plm80c altio.plm CODE
 
 sys.obj:	sys.a80
 	asm80 sys.a80
