@@ -15,14 +15,12 @@ RXRDY	EQU	02H		; Receive ready mask
 ;;;
 ;;; Expects 8251A to have not been used since reset
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-IOINIT:	IF 0
-	MVI	A,0H		; Reset 8251
+IOINIT:	MVI	A,0H		; Reset 8251
 	OUT	SSR
 	OUT	SSR
 	OUT	SSR
 	MVI	A,40H
 	OUT	SSR
-	ENDIF
 	MVI	A,4EH		; 8N1, X16 baud rate
 	OUT	SSR
 	MVI	A,37H		; Enable RTS, DTR, TX, RX

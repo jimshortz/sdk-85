@@ -336,38 +336,43 @@ HELP$CMD:	PROCEDURE;
 	'(V)erify EPROM',13,10,0));
 END;
 
+BAD$CMD: PROCEDURE;
+    CALL PUTS(.('Unknown command.',13,10,0));
+END;
+
 /************************************************************************
  * Main Program
  ***********************************************************************/
-DECLARE CMD BYTE;
+DECLARE CMD	BYTE,
+	I   	BYTE,
+	HANDLER ADDRESS,
+	CMDS(8) STRUCTURE(
+		C	BYTE,
+		HANDLER	ADDRESS)
+		INITIAL (
+		'B', .BCHECK$CMD,
+		'C', .CLEAR$CMD,
+		'D', .DNLOAD$CMD,
+		'H', .HELP$CMD,
+		'R', .READ$CMD,
+		'P', .PROG$CMD,
+		'U', .UPLOAD$CMD,
+		'V', .VERIFY$CMD);
 
 CALL IOINIT;
 CALL EPINIT;
-
-CALL PUTS(.(13,10,13,10,'SDK-85 EPROM Manager v1.0 by Jim Shortz',13,10,0));
 CALL CLEAR;
+CALL PUTS(.(13,10,13,10,'SDK-85 EPROM Manager v1.0 by Jim Shortz',13,10,0));
 
 DO WHILE 1=1;
    CALL PUTS(.('Enter command (H for help):',13,10,0));
    CMD = GETC;
-   IF CMD = 'H' THEN
-      CALL HELP$CMD;
-   ELSE IF CMD = 'B' THEN
-      CALL BCHECK$CMD;
-   ELSE IF CMD = 'C' THEN
-      CALL CLEAR$CMD;
-   ELSE IF CMD = 'D' THEN
-      CALL DNLOAD$CMD;
-   ELSE IF CMD = 'R' THEN
-      CALL READ$CMD;
-   ELSE IF CMD = 'P' THEN
-      CALL PROG$CMD;
-   ELSE IF CMD = 'U' THEN
-      CALL UPLOAD$CMD;
-   ELSE IF CMD = 'V' THEN
-      CALL VERIFY$CMD;
-   ELSE
-	CALL PUTS(.('Unknown command.',13,10,0));
+   HANDLER = .BAD$CMD;
+   DO I = 0 TO LENGTH(CMDS)-1;
+      IF CMD = CMDS(I).C THEN
+	 HANDLER = CMDS(I).HANDLER;
+   END;
+   CALL HANDLER;
 END;
 
 END;
