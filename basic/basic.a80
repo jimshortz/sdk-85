@@ -26,14 +26,12 @@ RXRDY	EQU	02H		; Receive ready mask
 	ORG	8000H		; Beginning of RAM
 BASIC:				;FULL RESTART INITIALIZATION
 SYSINITJ:
-	IF 0
 	MVI	A,0H		; Reset 8251
 	OUT	SSR
 	OUT	SSR
 	OUT	SSR
 	MVI	A,40H
 	OUT	SSR
-	ENDIF
 	MVI	A,4EH		; 8N1, X16 baud rate
 	OUT	SSR
 	MVI	A,37H		; Enable RTS, DTR, TX, RX
@@ -6352,4 +6350,4 @@ INITSTCK:
 	DS	20
 LIMLOWER:			; Program memory begins here
 
-	END
+	END	BASIC

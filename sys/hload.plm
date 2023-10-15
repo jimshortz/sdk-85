@@ -21,7 +21,7 @@ DECLARE	XSUM	BYTE,	  		/* Running checksum */
 	ADDR 	ADDRESS;		/* Address of record */
 
 /* Setup serial port */
-INIT: PROCEDURE EXTERNAL;
+IOINIT: PROCEDURE EXTERNAL;
 END;
 
 /* Exit program */
@@ -119,7 +119,7 @@ ENDREC: PROCEDURE;
 END;
 
 /* Main Program */
-CALL INIT;
+CALL IOINIT;
 
 /* Show a lame excuse for a prompt */
 CALL PUTC('>');

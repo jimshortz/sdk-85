@@ -1,10 +1,11 @@
-all:	basic.bin
+all:	basic.hex
 
-basic.bin:	basic.obj
-	objcore basic.obj basic.bin
+%.hex:	%.obj
+	objhex $< $@
 
-basic.obj:	basic.a80
-	asm80 basic.a80
+%.obj:	%.a80
+	asm80 $<
 
 clean:
-	rm *.obj *.bin
+	-rm *.obj *.lnk *.bin *.lst *.hex *~
+
