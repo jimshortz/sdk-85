@@ -3,7 +3,7 @@
 ;;; Absolute minimal version - use to load a better loader
 
 LOC	EQU	2080H		; Where to load program
-DEST	EQU	2000H		; Where to write program
+DEST	EQU	0F800H		; Where to write program
 STK	EQU	20C2H		; Stack pointer
 
 ;;; Serial port addresses
