@@ -3,5 +3,8 @@ docs/
 *.hex
 *.lst
 *.log
+*.obj
+*.abs
+*.rel
 *~
 #*

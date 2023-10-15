@@ -2456,9 +2456,15 @@ rxrdy:	equ	0x02		; RX ready bitmask
 	
 ; TTY Setup Routine
 ttyinit:
-	ld a,4eh		; 8N1, baud x16
+	ld  a,0			; Reset 8251 from unknown state
 	out (ssr),a
-	ld a,37h		; Enable RTS, DTR, TX, RX
+	out (ssr),a
+	out (ssr),a
+	ld  a,40h
+	out (ssr),a
+	ld  a,4eh		; 8N1, baud x16
+	out (ssr),a
+	ld  a,37h		; Enable RTS, DTR, TX, RX
 	out (ssr),a
 	ret
 

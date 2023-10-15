@@ -22,6 +22,10 @@ DECLARE	(I,J) ADDRESS;
  * Sets up serial port
  ***********************************************************************/
 INIT: PROCEDURE;
+      OUTPUT(SSR) = 00H;
+      OUTPUT(SSR) = 00H;
+      OUTPUT(SSR) = 00H;
+      OUTPUT(SSR) = 40H;      
       OUTPUT(SSR) = 4EH;
       OUTPUT(SSR) = 37H;
 END;
