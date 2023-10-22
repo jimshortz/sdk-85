@@ -33,7 +33,7 @@ INIT:   LXI     SP,STCK
 GAME:	INR     B               ; TIME-BASED RANDOM SEED
         JZ      GAME            ; ENSURE NON-ZERO
         IN      SWITCH          ; WAS BUTTON PRESSED?
-	XRI	0FH
+	ANI	0FH
         JZ	GAME
 	MVI     C,1             ; START WITH ONE STEP
 TURN:   CALL    PLAY            ; PLAY SEQUENCE TO USER
@@ -122,7 +122,7 @@ SHOW1:  RAL			; KEEP MOVING UNTIL COUNTER EXHAUSTED
 RDKEY:  PUSH    B		; SAVE REGS
         MVI     C,0             ; ATTEMPT COUNTER
 RDKEY1: IN      SWITCH
-        XRI     0FH             ; ANY BUTTONS PRESSED?
+	ANI	0FH             ; ANY BUTTONS PRESSED?
         JNZ     RDKEY2
         LXI     D,2485 		; WAIT 19.5MS	
         CALL    DELAY
@@ -182,5 +182,5 @@ TTBL:	DW	220,285		; RED (A3)
 	
 ;;; GLOBAL VARIABLE
 LFSR:   DB      0               ; RANDOM GENERATOR STATE
-	END
+	END	INIT
 
