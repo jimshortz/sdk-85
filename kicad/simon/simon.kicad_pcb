@@ -5,6 +5,12 @@
   )
 
   (paper "USLetter")
+  (title_block
+    (title "Disco Memory Game for SDK-85")
+    (date "2023-10-22")
+    (company "Jim Shortz")
+  )
+
   (layers
     (0 "F.Cu" signal)
     (31 "B.Cu" signal)
@@ -1574,11 +1580,11 @@
     )
   )
 
-  (gr_circle (center 135.89 62.738) (end 137.414 62.992)
+  (gr_circle (center 135.89 62.738) (end 137.668 62.738)
     (stroke (width 0.1) (type default)) (fill none) (layer "Edge.Cuts") (tstamp 7b15587d-fda4-40c9-8e04-a1560087daed))
   (gr_rect (start 133.096 60.198) (end 224.536 122.174)
     (stroke (width 0.1) (type default)) (fill none) (layer "Edge.Cuts") (tstamp 86575b9a-a9ec-49f8-b9c1-6ef67ec3f186))
-  (gr_circle (center 135.382 119.888) (end 136.906 120.142)
+  (gr_circle (center 135.89 119.634) (end 137.668 119.634)
     (stroke (width 0.1) (type default)) (fill none) (layer "Edge.Cuts") (tstamp e340e2e3-3d66-4afb-98d3-040764f974c2))
   (gr_text "GND" (at 178.562 66.04) (layer "F.SilkS") (tstamp 06a25b5e-e17d-4337-a019-cc4a19152540)
     (effects (font (size 1 1) (thickness 0.15)) (justify left bottom))
@@ -1589,7 +1595,7 @@
   (gr_text "+5" (at 175.768 66.04) (layer "F.SilkS") (tstamp b83265b4-a512-4fdd-b38a-01e37a460c14)
     (effects (font (size 1 1) (thickness 0.15)) (justify left bottom))
   )
-  (gr_text "https://github.com/jimshortz/sdk-85\nv1.0 - Oct 2023" (at 178.308 118.872) (layer "Edge.Cuts") (tstamp 9ac3d8d2-8fdd-490e-be8e-33a0658f2ce6)
+  (gr_text "https://github.com/jimshortz/sdk-85\nv1.0.1 - Oct 2023" (at 178.308 118.872) (layer "Edge.Cuts") (tstamp 9ac3d8d2-8fdd-490e-be8e-33a0658f2ce6)
     (effects (font (size 1.27 1.27) (thickness 0.1905)) (justify bottom))
   )
 
