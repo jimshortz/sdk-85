@@ -11,7 +11,7 @@ DECLARE
 	FALSE LITERALLY '00H',
 	DATTYPE LITERALLY '00H',	/* Data record type */
 	ENDTYPE LITERALLY '01H',	/* End record type */
-	MINADDR LITERALLY '8000H',	/* Beginning of expanded RAM */
+	MINADDR LITERALLY '2800H',	/* Beginning of expanded RAM */
 	MAXADDR LITERALLY '0F800H';	/* Beginning of this loader */
 
 DECLARE	XSUM	BYTE,	  		/* Running checksum */
