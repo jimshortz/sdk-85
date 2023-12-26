@@ -1,0 +1,168 @@
+	EXTRN	GETC,PUTC,IOINIT
+
+;;; FUNCTION: VALDG
+;;; INPUTS: C - ASCII CHARACTER
+;;; OUTPUTS : CARRY IF CHARACTER REPRESENTS VALID HEX DIGIT
+	VALDG	EQU	075EH
+
+;;; FUNCTION: CNVBN
+;;; INPUTS: C - ASCII CHARACTER '0'-'9' OR 'A'-'F'
+;;; OUTPUTS: A - 0 TO F HEX
+	CNVBN	EQU	05BBH
+
+	CSEG
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Main program
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+START:	LXI	SP,STACK	; Initialize everything
+	CALL	IOINIT
+	LXI	H,HIMSG		; Say hello
+	CALL	PUTS
+	MVI	A,0		; No errors yet
+	STA	ERRS
+
+;;; Read a record into buffer
+REC:	MVI	A,0		; Clear checksum
+	STA	XSUM
+	CALL	GETCE		; Loop until : received
+	CPI	':'
+	JNZ	REC
+	LXI	H,BUF		; Start reading into buffer
+REC1:	CALL	BYTE		; Read next byte
+	JNC	EREC		; Non-hex character
+	MOV	M,A		; Store it
+	LDA	XSUM		; Update checksum
+	ADD	M
+	STA	XSUM
+	INX	H
+	MVI	A,LOW XSUM	; Reached end of buffer?
+	CMP	L
+	JNZ	REC1
+
+;;; Process record
+EREC:	LDA	XSUM		; Verify checksum
+	CPI	0
+	JNZ	ERR		; Checksum error
+	LDA	TYPE		; Verify type
+	CPI	0		; Is it a data record?
+	JZ	COPY	
+	DCR	A		; End of file record?
+	JZ	EOF
+ERR:	MVI	A,'!'
+	STA	ERRS		; Set error flag
+	CALL	PUTC
+	JMP	REC
+
+;;; Process data record
+COPY:	LHLD	ADDR
+	MOV	D,L		; Destination to DE (swapped)
+	MOV	E,H
+	;;  TODO - error if < 2800
+	LXI	H,PAYLD		; Source to HL
+	LDA	LEN
+	CPI	0
+	JZ	REC		; Empty record?
+	;; TODO - error if > 32	
+	MOV	C,A		; Byte count
+COPY1:	MOV	A,M
+	XCHG
+	MOV	M,A
+	XCHG
+	INX	H
+	INX	D
+	DCR	C
+	JNZ	COPY1
+	JMP	REC
+
+;;; Process end of file record
+EOF:	LDA	ERRS		; Did we get any errors?
+	CPI	0
+	JNZ	FAIL
+	LXI	H,OKMSG		; Display OK message
+	CALL	PUTS
+	CALL	GETCE		; Flush input
+	LXI	H,BYE		; Push return address
+	PUSH	H
+	LHLD	ADDR		; Jump to addr
+	PCHL		
+BYE:	RST	1		; Just in case it returns
+
+;;; Display failure message and reset
+FAIL:	LXI	H,FAILMSG
+	CALL	PUTS
+	JMP	START
+		
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Read a hex nybble from serial port
+;;; Returns:
+;;; 	A - Value
+;;; 	Carry - 1 if valid, 0 if non-hex
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+NYB:	CALL	GETCE
+	MOV	C,A
+	CALL	VALDG
+	RNC
+	CALL	CNVBN
+	STC
+	RET
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Read a hex nybble from serial port
+;;; Returns:
+;;; 	A - Value
+;;; 	Carry - 1 if valid, 0 if non-hex
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	
+BYTE:	CALL	NYB
+	RNC
+	RLC
+	RLC
+	RLC
+	RLC
+	MOV	B,A
+	CALL	NYB
+	RNC
+	ORA	B
+	STC
+	RET
+	
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Read character and echo back
+;;; Returns
+;;;  	A - Character read
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+GETCE:	CALL	GETC
+	MOV	C,A
+	JMP	PUTC
+	
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Write null terminated string at HL
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+PUTS:	MOV	A,M
+	CPI	0
+	RZ
+	CALL	PUTC
+	INX	H
+	JMP	PUTS
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Messages
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+HIMSG:	DB	'HEX>',0
+OKMSG:	DB	'OK',13,10,0
+FAILMSG:DB	'FAILED',13,10,0
+	
+	DSEG
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Variables
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+BUF:				; Buffer for hex record
+LEN:	DS	1		; 	Record length
+ADDR:	DS	2		;	Record address
+TYPE:	DS	1		;	Record type
+PAYLD:	DS	32	       	; 	Data bytes of record
+XS0:	DS	1		; 	Record checksum
+XSUM:	DS	1		; Calculated checksum (must follow buf)
+ERRS:	DS	1		; Non-zero if errors occurred
+	
+	END	START

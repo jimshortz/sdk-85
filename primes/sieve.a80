@@ -1,0 +1,121 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Prime finder for SDK-85 (assembly version)
+;;;
+;;; by Jim Shortz 2023-12-26
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	
+MAX	EQU	8192		; Largest prime to find
+SDR	EQU	80H		; Serial data register
+SSR	EQU	81H		; Serial status register
+TXRDY	EQU	01H		; Transmit ready mask
+	
+	ORG	8000H
+	
+SIEVE:	LXI	SP,STCK		; Set up stack
+
+;;; Clear array
+	LXI	H,ARY		
+CLEAR:	MVI	M,0
+	INX	H
+	MOV	A,H		; Are we at end?
+	CPI	ARYEND SHR 8
+	JNZ	CLEAR
+
+;;;  Loop DE through numbers 2 to MAX
+	LXI	D,2
+TEST:	LXI	H,ARY		; Is DE prime?  Look in array.
+	DAD	D
+	MOV	A,M
+	CPI	0
+	JNZ	NEXT		; Not prime
+	CALL	PRDEC		; Display it
+MARK:	MVI	M,0FFH		; Mark all multiples as prime
+	DAD	D
+	MOV	A,H
+	CPI	ARYEND SHR 8
+	JZ	NEXT
+	JC	MARK
+NEXT:	INX	D		; Advance to next DE value
+	MOV	A,D
+	CPI	MAX SHR 8
+	JNZ	TEST
+	RST	1		; DONE
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Print DE to console as decimal
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+PRDEC:	PUSH	H
+	PUSH	B
+	MOV	H,D		; Convert to BCD (in HL)
+	MOV	L,E
+	CALL	TOBCD
+	MVI	B,4		; Walk through all 4 digits
+PRDEC1:	MVI	A,0		; Shift 4 bits into A
+	DAD	H
+	RAL
+	DAD	H
+	RAL
+	DAD	H
+	RAL
+	DAD	H
+	RAL
+	ORI	'0'		; Convert to ASCII
+	MOV	C,A
+	CALL	PUTC		; Print
+	DCR	B
+	JNZ	PRDEC1
+	MVI	C,13		; Print a CR/LF
+	CALL	PUTC
+	MVI	C,10
+	CALL	PUTC
+	POP	B
+	POP	H
+	RET
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Converts HL from binary to BCD
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+TOBCD:	PUSH	B
+	PUSH	D
+	LXI	D,0
+	MVI	C,16		; Shift 16 bits
+TOBCD1:	DAD	H		; Shift HL left one bit
+	MOV	A,E		; Shift DE left using a BCD add with carry
+	ADC	E		; (Carry is bit shfited from HL)
+	DAA
+	MOV	E,A
+	MOV	A,D
+	ADC	D
+	DAA
+	MOV	D,A
+	DCR	C
+	JNZ	TOBCD1
+	XCHG			; Move result to HL
+	POP	D
+	POP	B
+	RET
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Write a byte from C to the serial port.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+PUTC:	IN	SSR		; Wait for TXRDY to be set.
+	ANI	TXRDY
+	JZ	PUTC
+	MOV	A,C		; Write character to port
+	OUT	SDR
+	RET
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Stack/data
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	DS	20H
+STCK:	DS	20H
+	
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Array of primes
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	ORG	9000H
+ARY:	DS	MAX
+ARYEND:
+	
+	END	SIEVE

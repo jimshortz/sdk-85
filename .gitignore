@@ -4,7 +4,6 @@ docs/
 *.lst
 *.log
 *.obj
-*.abs
-*.rel
+*.lnk
 *~
 #*

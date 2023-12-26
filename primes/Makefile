@@ -1,4 +1,4 @@
-all:	primes.hex
+all:	primes.hex sieve.hex
 
 primes.hex:	primes.obj
 	link primes.obj,plm80.lib to primes.rel MAP
@@ -6,8 +6,14 @@ primes.hex:	primes.obj
 	objhex primes.abs primes.hex
 	-rm primes.rel primes.abs
 
+sieve.hex:	sieve.obj
+	objhex $< $@
+
+%.obj:	%.a80
+	asm80 $<
+
 %.obj:	%.plm
 	-plm80c $< CODE
 
 clean:
-	rm *.obj *.abs *.rel *.bin *.hex
+	rm *.obj *.abs *.rel *.bin *.hex *.lst *~
